@@ -1,0 +1,54 @@
+REM MOVE ROM TO RAM ON A COCO 1 & 2
+10 READ A$:IF A$="X" THEN END
+20 POKE 20000+N,VAL("&H"+A$)
+30 N=N+1:GOTO 10
+40 DATA 34,01,1A,50,10,8E,80,00
+REM LOOP TO COPY 6 BYTES AT A TIME. FASTER BUT NOT REQUIRED TO WORK
+50 DATA B7,FF,DE,EC,A4,AE,22,EE
+60 DATA 24,B7,FF,DF,ED,A1,AF,A1
+70 DATA EF,A1,10,8C,F3,FC,25,E8
+REM LOOP TO COPY 2 BYTES AT A TIME.
+80 DATA 10,8C,FF,00,24,0C,B7,FF
+90 DATA DE,EC,A4,B7,FF,DF,ED,A1
+100 DATA 20,EE,35,01,39
+110 DATA X
+
+
+;*************************************************
+;* Tandy CoCo 1 & 2 ROM to RAM
+;* copies the contents of ROM to RAM and continues running it from there
+;*************************************************
+
+; start at location 20000 (code is position independant though)
+			org		$4E20
+
+; start	of code
+34,01		pshs	$01			; save cc register
+1A,50		orcc	$50			; disable interrupts
+
+10,8E,80,00	ldy		$8000		; point to ROM start address
+
+loop1:							; copy 6 bytes at a time
+B7,FF,DE	sta		$FFDE		; set ROM mode
+EC,A4		ldd		,y			; read 6 bytes of ROM data
+AE,22		ldx		2,y
+EE,24		ldu		4,y
+B7,FF,DF	sta		#$FFDF		; set RAM mode
+ED,A1		std		,y++		; write 6 bytes and update mem pointer
+AF,A1		stx		,y++
+EF,A1		stu		,y++
+10,8C,F3,FC	cmpy	$F3FC		; are we done with 6 byte copy?
+25,E8		blo		loop1		; go again if not
+
+loop2:							; copy 2 bytes at a time
+10,8C,FF,00	cmpy	$FF00		; are we done with 2 byte copy?
+24,0C		bhs		exit		; branch if yes
+B7,FF,DE	sta		$FFDE		; set ROM mode	
+EC,A4		ldd		,y			; read 2 bytes
+B7,FF,DF	sta		$FFDF		; set RAM mode
+ED,A1		std		,y++		; write 2 bytes and update mem pointer
+20,EE		bra		loop2		; loop
+
+exit:
+35,01		puls	$01			; restore cc register
+39			rts
